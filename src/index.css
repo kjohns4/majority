@@ -1,0 +1,20 @@
+/* Tailwind CSS v4 — a single import pulls in base, components, and utilities.
+   In v4 there is no tailwind.config.js or PostCSS step; the @tailwindcss/vite
+   plugin (see vite.config.ts) scans our files and generates the CSS. */
+@import 'tailwindcss';
+
+/* App-wide defaults. Majority has a dark, music-app feel by default. */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: #0a0a0f;
+  color: #f5f5f7;
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
