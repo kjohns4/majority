@@ -12,9 +12,17 @@ body,
 
 body {
   margin: 0;
-  background-color: #0a0a0f;
   color: #f5f5f7;
   font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* A dark base with a soft fuchsia glow up top — gives the music-app feel
+     without fighting the album art for attention. fixed so it doesn't scroll. */
+  background-color: #0a0a0f;
+  background-image: radial-gradient(
+    120% 80% at 50% -10%,
+    rgba(217, 70, 239, 0.18) 0%,
+    rgba(10, 10, 15, 0) 60%
+  );
+  background-attachment: fixed;
 }

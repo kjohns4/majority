@@ -33,6 +33,10 @@ function App() {
       <main className="flex-1">
         {view === 'discover' ? <CardView /> : <LeaderboardView />}
       </main>
+
+      <footer className="mt-10 text-center text-xs text-white/30">
+        Built with real votes · Spotify + Deezer previews · Supabase
+      </footer>
     </div>
   )
 }
