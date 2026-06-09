@@ -76,6 +76,9 @@ export default function Leaderboard() {
   }, [])
 
   useEffect(() => {
+    // Initial fetch. load() is async, so its setState calls run after an await
+    // (not synchronously in the effect) — the experimental rule can't see that.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load()
 
     // Realtime: refresh whenever a vote is inserted.

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import type { Song, VoteValue } from '../types'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -27,17 +27,9 @@ export default function SongCard({ song, onVote }: SongCardProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
 
-  // Whenever the song changes, stop and rewind the player. Without this, hitting
-  // "next" mid-clip would leave the old preview playing under the new card.
-  useEffect(() => {
-    const audio = audioRef.current
-    if (audio) {
-      audio.pause()
-      audio.currentTime = 0
-    }
-    setIsPlaying(false)
-  }, [song.id])
-
+  // Note: the parent renders this card with key={song.id}, so changing songs
+  // remounts the component — that resets the <audio> element and isPlaying for
+  // free, so there's no effect needed to stop a previous clip bleeding through.
   const hasPreview = Boolean(song.previewUrl)
 
   function togglePlay() {
