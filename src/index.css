@@ -25,6 +25,12 @@ body,
   height: 100%;
 }
 
+/* Opt out of browser dark-mode auto-darkening — iOS Safari otherwise tints
+   the cream palette brown when the device is in Dark Mode. */
+html {
+  color-scheme: light;
+}
+
 body {
   margin: 0;
   background-color: var(--color-cream);
