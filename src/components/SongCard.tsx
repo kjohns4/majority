@@ -34,6 +34,7 @@ export default function SongCard({ song, onVote }: SongCardProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const retriedRef = useRef(false)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [hasPlayed, setHasPlayed] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
   // A null preview_url at seed time means the track had no preview at all; skip
@@ -94,6 +95,9 @@ export default function SongCard({ song, onVote }: SongCardProps) {
   }
 
   const monogram = song.title.trim().charAt(0).toUpperCase()
+  // Voting is locked until the user has actually listened. Tracks with no preview
+  // can't be played, so allow voting on those (you can't be asked to listen first).
+  const canVote = hasPlayed || status === 'unavailable'
 
   return (
     <div className="w-full max-w-sm rounded-3xl bg-card p-6 shadow-[0_20px_60px_-30px_rgba(74,68,63,0.4)] ring-1 ring-line">
@@ -111,73 +115,95 @@ export default function SongCard({ song, onVote }: SongCardProps) {
           </div>
         )}
 
-        {/* Play / pause overlay button. Disabled until a fresh URL is resolved. */}
-        <button
-          type="button"
-          onClick={togglePlay}
-          disabled={status !== 'ready'}
-          aria-label={
-            status === 'resolving'
-              ? 'Loading preview'
-              : isPlaying
-                ? 'Pause preview'
-                : 'Play preview'
-          }
-          className="absolute bottom-3 right-3 flex h-14 w-14 items-center justify-center rounded-full bg-card text-ink shadow-md ring-1 ring-line transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {status === 'resolving' ? (
-            <span className="h-5 w-5 animate-spin rounded-full border-2 border-ink/20 border-t-ink" />
-          ) : isPlaying ? (
-            <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current" aria-hidden="true">
-              <path d="M7 5h3.2v14H7zM13.8 5H17v14h-3.2z" />
-            </svg>
-          ) : (
-            <svg viewBox="0 0 24 24" className="ml-0.5 h-5 w-5 fill-current" aria-hidden="true">
-              <path d="M8 5v14l11-7z" />
-            </svg>
-          )}
-        </button>
+        {/* Big play/pause control over the whole cover. Shows the pause icon while
+            playing (and stays put), the play icon when paused. Hidden only when
+            there's no preview at all. */}
+        {status !== 'unavailable' && (
+          <button
+            type="button"
+            onClick={togglePlay}
+            disabled={status !== 'ready'}
+            aria-label={
+              status === 'resolving'
+                ? 'Loading preview'
+                : isPlaying
+                  ? 'Pause preview'
+                  : 'Play preview'
+            }
+            className="group absolute inset-0 flex items-center justify-center disabled:cursor-default"
+          >
+            {/* Soft veil — stronger when paused to invite a tap, fading once playing. */}
+            <span
+              className={
+                'absolute inset-0 transition-colors ' +
+                (isPlaying ? 'bg-black/10 group-hover:bg-black/20' : 'bg-black/25')
+              }
+            />
+            {/* The badge itself. */}
+            <span className="relative flex h-20 w-20 items-center justify-center rounded-full bg-card/85 text-ink shadow-lg ring-1 ring-line backdrop-blur-sm transition group-hover:bg-card">
+              {status === 'resolving' ? (
+                <span className="h-7 w-7 animate-spin rounded-full border-2 border-ink/20 border-t-ink" />
+              ) : isPlaying ? (
+                <svg viewBox="0 0 24 24" className="h-9 w-9 fill-current" aria-hidden="true">
+                  <path d="M7 5h3.2v14H7zM13.8 5H17v14h-3.2z" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" className="ml-1 h-9 w-9 fill-current" aria-hidden="true">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              )}
+            </span>
+          </button>
+        )}
       </div>
 
       {/* Title + artist. truncate keeps long names on one tidy line. */}
       <h2 className="truncate text-2xl text-ink" title={song.title}>
         {song.title}
       </h2>
-      <p className="mb-1 truncate text-lg italic text-ink-soft" title={song.artist}>
+      <p className="truncate text-lg italic text-ink-soft" title={song.artist}>
         {song.artist}
       </p>
 
-      {status === 'unavailable' && (
-        <p className="mb-3 text-sm italic text-ink-soft/80">
-          No preview available — you can still vote.
-        </p>
-      )}
+      {/* Status line: no-preview note, or a "listen first" nudge while locked. */}
+      <p className="mt-1 h-5 text-sm italic text-ink-soft/80">
+        {status === 'unavailable'
+          ? 'No preview available — you can still vote.'
+          : !canVote
+            ? 'Press play to unlock voting.'
+            : ''}
+      </p>
 
       {/* Audio element; src is the freshly-resolved URL. */}
       {previewUrl && (
         <audio
           ref={audioRef}
           src={previewUrl}
-          onPlay={() => setIsPlaying(true)}
+          onPlay={() => {
+            setIsPlaying(true)
+            setHasPlayed(true)
+          }}
           onPause={() => setIsPlaying(false)}
           onEnded={() => setIsPlaying(false)}
           onError={handleAudioError}
         />
       )}
 
-      {/* Vote buttons. */}
-      <div className="mt-5 flex gap-3">
+      {/* Vote buttons — locked until the user has listened. */}
+      <div className="mt-4 flex gap-3">
         <button
           type="button"
           onClick={() => onVote(-1)}
-          className="flex-1 rounded-2xl bg-sand py-3 text-lg tracking-wide text-ink ring-1 ring-line transition hover:bg-sand-deep"
+          disabled={!canVote}
+          className="flex-1 rounded-2xl bg-sand py-3 text-lg tracking-wide text-ink ring-1 ring-line transition enabled:hover:bg-sand-deep disabled:cursor-not-allowed disabled:opacity-40"
         >
           Pass
         </button>
         <button
           type="button"
           onClick={() => onVote(1)}
-          className="flex-1 rounded-2xl bg-ink py-3 text-lg tracking-wide text-cream transition hover:opacity-90"
+          disabled={!canVote}
+          className="flex-1 rounded-2xl bg-ink py-3 text-lg tracking-wide text-cream transition enabled:hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
         >
           Like
         </button>
