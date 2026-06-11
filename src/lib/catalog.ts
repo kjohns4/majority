@@ -30,6 +30,75 @@ async function readSeededSongs(): Promise<Song[]> {
   return (data as SongRow[]).map(songFromRow)
 }
 
+// ── Fresh preview URLs ──────────────────────────────────────────────────────
+// Deezer preview URLs are signed and expire after ~15 minutes, so the one stored
+// at seed time can't be trusted for playback. `resolvePreview` fetches a current
+// URL for a track right before it's played.
+
+interface DeezerTrackResponse {
+  preview?: string | null
+}
+
+/**
+ * Browser-side fallback for plain `vite dev` (no serverless function). The
+ * Deezer API doesn't send CORS headers, so a normal fetch() is blocked — but it
+ * supports JSONP, which loads via a <script> tag and sidesteps CORS entirely.
+ */
+function deezerJsonp(trackId: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const cbName = `__dzcb_${Math.random().toString(36).slice(2)}`
+    const globals = window as unknown as Record<
+      string,
+      ((data: DeezerTrackResponse) => void) | undefined
+    >
+    const script = document.createElement('script')
+
+    const cleanup = () => {
+      clearTimeout(timer)
+      delete globals[cbName]
+      script.remove()
+    }
+    const timer = setTimeout(() => {
+      cleanup()
+      resolve(null)
+    }, 8000)
+
+    globals[cbName] = (data) => {
+      const preview = data?.preview ?? null
+      cleanup()
+      resolve(preview)
+    }
+    script.onerror = () => {
+      cleanup()
+      resolve(null)
+    }
+    script.src = `https://api.deezer.com/track/${encodeURIComponent(
+      trackId,
+    )}?output=jsonp&callback=${cbName}`
+    document.body.appendChild(script)
+  })
+}
+
+/**
+ * Returns a currently-valid 30s preview URL for a Deezer track id, or null if
+ * none is available. Prefers our /api/preview proxy (clean, works in prod), and
+ * falls back to Deezer JSONP when the function isn't running locally.
+ */
+export async function resolvePreview(trackId: string): Promise<string | null> {
+  try {
+    const res = await fetch(`/api/preview?trackId=${encodeURIComponent(trackId)}`)
+    const contentType = res.headers.get('content-type') ?? ''
+    if (res.ok && contentType.includes('application/json')) {
+      const body = (await res.json()) as { preview?: string | null }
+      // Proxy is authoritative when it answers with JSON (even a null preview).
+      return body.preview ?? null
+    }
+  } catch {
+    // Fall through to the JSONP fallback.
+  }
+  return deezerJsonp(trackId)
+}
+
 /**
  * Returns ~50 songs. Tries the server endpoint first (which refreshes the
  * catalog from Deezer), then falls back to whatever is already stored.
