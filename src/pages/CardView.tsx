@@ -89,9 +89,6 @@ export default function CardView() {
     <div className="flex flex-col items-center">
       {/* key={song.id} remounts the card per song, resetting its audio player. */}
       <SongCard key={currentSong.id} song={currentSong} onVote={handleVote} />
-      <p className="mt-5 text-sm tracking-wide text-ink-soft/70">
-        {index + 1} of {songs.length}
-      </p>
     </div>
   )
 }
