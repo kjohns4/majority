@@ -101,6 +101,12 @@ store votes, show real-time leaderboard.
   just the external unique id used for upsert de-duplication.
 - **`songs` is server-seeded** — the anon key is read-only on it (RLS), so seeding runs
   in `api/songs.ts` with the service-role key. Needs `SUPABASE_SERVICE_ROLE_KEY`.
+- **Catalog rotation = read-window, not deletes (Option D)** — Discover only reads songs
+  first seen in the last 7 days (`DISCOVER_WINDOW_DAYS` in `src/lib/catalog.ts`). Rows are
+  never deleted, so the leaderboard keeps full history; the swipe pool just rotates.
+- **Deezer preview URLs expire (~15 min)** — signed `hdnea=exp` tokens. Don't trust the
+  stored `preview_url`; the client resolves a fresh one at play time via `/api/preview`
+  (JSONP fallback for plain `npm run dev`).
 - Duplicate voting prevention: SHA-256 of a per-browser id stored in `ip_hash` (MVP
   stand-in for real IP hashing — good enough for day 1, not abuse-proof)
 - Deezer has an informal rate limit (~50 req / 5s); the seeder batches album fetches

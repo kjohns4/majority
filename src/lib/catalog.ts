@@ -14,13 +14,27 @@ import { songFromRow, type Song, type SongRow } from '../types'
 //       + returns rows). Fallback path: if that endpoint isn't running (e.g.
 //       plain `npm run dev` with no serverless functions), read whatever songs
 //       are already in Supabase so the UI still has something to show.
+//
+//       Rotation (Option D): we never delete songs — the table keeps full
+//       history so the leaderboard stays intact. Discover just *reads a window*:
+//       only songs first seen in the last 7 days are swipeable. So the catalog
+//       rotates without ever destroying vote history.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Reads already-seeded songs straight from Supabase (anon, read-only). */
+/** How far back Discover looks. Older songs stay in the DB but aren't swiped. */
+const DISCOVER_WINDOW_DAYS = 7
+
+function discoverCutoff(): { iso: string; ms: number } {
+  const ms = Date.now() - DISCOVER_WINDOW_DAYS * 24 * 60 * 60 * 1000
+  return { iso: new Date(ms).toISOString(), ms }
+}
+
+/** Reads recently-seeded songs straight from Supabase (anon, read-only). */
 async function readSeededSongs(): Promise<Song[]> {
   const { data, error } = await supabase
     .from('songs')
     .select('*')
+    .gte('created_at', discoverCutoff().iso)
     .order('created_at', { ascending: false })
     .limit(50)
 
@@ -104,6 +118,8 @@ export async function resolvePreview(trackId: string): Promise<string | null> {
  * catalog from Deezer), then falls back to whatever is already stored.
  */
 export async function fetchEmergingSongs(): Promise<Song[]> {
+  let songs: Song[] | null = null
+
   try {
     const res = await fetch('/api/songs')
     // In plain `vite dev` there's no function, so the dev server returns the
@@ -113,12 +129,20 @@ export async function fetchEmergingSongs(): Promise<Song[]> {
       const body = (await res.json()) as { songs?: SongRow[]; error?: string }
       if (body.error) throw new Error(body.error)
       if (body.songs && body.songs.length > 0) {
-        return body.songs.map(songFromRow)
+        songs = body.songs.map(songFromRow)
       }
     }
   } catch {
     // Swallow and fall through to the Supabase fallback below.
   }
 
-  return readSeededSongs()
+  if (!songs) {
+    songs = await readSeededSongs()
+  }
+
+  // Apply the Discover window uniformly, whichever path produced the songs: a
+  // re-seeded track keeps its original created_at, so an album that lingers in
+  // Deezer's new-releases feed for >7 days correctly ages out of Discover.
+  const { ms: cutoffMs } = discoverCutoff()
+  return songs.filter((s) => new Date(s.createdAt).getTime() >= cutoffMs)
 }

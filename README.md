@@ -99,6 +99,11 @@ tracks from Deezer and upserts them into Supabase.
 - **Deezer matching is by feed, not search.** Songs come from Deezer's
   new-releases editorial feed (topped up from charts), so they're real and fresh,
   but "emerging" is Deezer's definition, not a hand-curated indie feed.
+- **Discover shows the last 7 days only (rotation).** Songs are never deleted —
+  the table keeps full history so the leaderboard stays intact — but the Discover
+  feed only reads songs first seen in the last `DISCOVER_WINDOW_DAYS` (7) days, so
+  the swipe pool rotates as new releases come in. Change the window in
+  `src/lib/catalog.ts`.
 - **Anonymous voting is "good enough," not abuse-proof.** Duplicate prevention
   uses a SHA-256 of a per-browser id (stand-in for the `ip_hash` column). Clearing
   storage or switching browsers lets you vote again. Real prevention (server-side
