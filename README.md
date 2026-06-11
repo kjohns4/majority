@@ -10,21 +10,25 @@ no algorithm deciding for you.
 - **Styling:** Tailwind CSS v4 (via `@tailwindcss/vite`)
 - **Backend/DB/Auth:** Supabase (Postgres, anonymous voting, RLS)
 - **Serverless:** Vercel Functions (`/api`)
-- **Data:** Spotify Web API (metadata) + Deezer (preview fallback)
+- **Data:** Deezer public API (new releases + 30s previews, no auth)
 - **Deploy:** Vercel
 
 ## How it fits together
 
 ```
 Browser ──▶ /api/songs (Vercel Function)
-              ├─ Spotify (client-credentials, server-side)  ← uses SPOTIFY_CLIENT_SECRET
-              ├─ Deezer (backfills missing 30s previews)
-              └─ Supabase upsert (service-role)             ← uses SUPABASE_SERVICE_ROLE_KEY
+              ├─ Deezer (new-release albums + 30s previews — public, no key)
+              └─ Supabase upsert (service-role)   ← uses SUPABASE_SERVICE_ROLE_KEY
 Browser ──▶ Supabase (anon key): read songs, insert votes, read leaderboard
 ```
 
-The browser **never** sees the Spotify secret or the Supabase service-role key —
-both live only inside the serverless function (see "Security" below).
+The browser **never** sees the Supabase service-role key — it lives only inside
+the serverless function (see "Security" below). The catalog source (Deezer) needs
+no credentials at all.
+
+> **Why not Spotify?** Spotify's Web API now requires the *app owner's* account to
+> hold an active Premium subscription — every endpoint returns `403` without it.
+> Deezer has no such gate and reliably serves previews, so it's the catalog source.
 
 ## Environment variables
 
@@ -35,13 +39,11 @@ git-ignored.
 | --- | --- | --- |
 | `VITE_SUPABASE_URL` | Browser | Supabase project URL |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Browser | Anon key (RLS-restricted, safe to expose) |
-| `SPOTIFY_CLIENT_ID` | Server (`/api`) | Spotify app id |
-| `SPOTIFY_CLIENT_SECRET` | Server (`/api`) | Spotify secret — **never** prefixed `VITE_` |
 | `SUPABASE_URL` | Server (`/api`) | Supabase URL for the seeding function |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server (`/api`) | Writes to the read-only `songs` table |
 
 > ⚠️ Anything prefixed `VITE_` is bundled into the client JS and is **public**.
-> That's why the Spotify secret and the service-role key are *not* prefixed.
+> That's why the service-role key is *not* prefixed. (Deezer needs no key.)
 
 ## Supabase setup
 
@@ -69,20 +71,19 @@ vercel dev
 ```
 
 Seed the catalog by hitting the function once it's running: open `/api/songs` in
-the browser (or `curl localhost:3000/api/songs`). It fetches from Spotify,
-backfills previews from Deezer, and upserts into Supabase.
+the browser (or `curl localhost:3000/api/songs`). It pulls fresh new-release
+tracks from Deezer and upserts them into Supabase.
 
 ## Deploy (Vercel)
 
 1. Import the GitHub repo into Vercel (zero-config — it detects Vite + `/api`).
-2. Add **all six** env vars in the Vercel dashboard.
+2. Add the **four** env vars in the Vercel dashboard.
 3. Push to `main` → auto-deploy.
 
 ## Security
 
-- Spotify Client Secret and the Supabase service-role key run **only** in
-  `/api/songs` and are never prefixed `VITE_`, so Vite never bundles them into the
-  browser.
+- The Supabase service-role key runs **only** in `/api/songs` and is never
+  prefixed `VITE_`, so Vite never bundles it into the browser.
 - The browser uses the Supabase anon (publishable) key, locked down by RLS:
   read songs, insert votes — nothing destructive.
 - Vote inputs are validated client-side (`song_id` present, vote ∈ {1, -1}) and
@@ -90,10 +91,14 @@ backfills previews from Deezer, and upserts into Supabase.
 
 ## Known gotchas
 
-- **Spotify previews are mostly `null` now.** Since late 2024 Spotify stopped
-  returning `preview_url` for most tracks. The serverless function backfills from
-  Deezer's public API so the core "play a 30s clip" loop still works; tracks with
-  no preview anywhere are still votable, just not playable.
+- **Spotify is paywalled for API use.** Spotify's Web API now requires the app
+  owner to hold Premium (every endpoint `403`s otherwise), so the catalog is
+  sourced from Deezer instead. Deezer needs no auth and reliably returns previews.
+- **`spotify_id` column is now a Deezer id.** The DB column kept its name; it
+  holds the external Deezer track id (used for de-duplication on upsert).
+- **Deezer matching is by feed, not search.** Songs come from Deezer's
+  new-releases editorial feed (topped up from charts), so they're real and fresh,
+  but "emerging" is Deezer's definition, not a hand-curated indie feed.
 - **Anonymous voting is "good enough," not abuse-proof.** Duplicate prevention
   uses a SHA-256 of a per-browser id (stand-in for the `ip_hash` column). Clearing
   storage or switching browsers lets you vote again. Real prevention (server-side
@@ -105,10 +110,10 @@ backfills previews from Deezer, and upserts into Supabase.
 
 ```
 api/
-  songs.ts            # Serverless: Spotify -> Deezer -> Supabase upsert
+  songs.ts            # Serverless: Deezer new releases -> Supabase upsert
 src/
   components/         # SongCard, Leaderboard, Navigation
   pages/              # CardView (discover), LeaderboardView
-  lib/                # supabase, spotify, voting
+  lib/                # supabase, catalog, voting
   types/              # shared types + row mappers
 ```

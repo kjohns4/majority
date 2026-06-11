@@ -35,7 +35,7 @@ function App() {
       </main>
 
       <footer className="mt-10 text-center text-xs text-white/30">
-        Built with real votes · Spotify + Deezer previews · Supabase
+        Built with real votes · Deezer previews · Supabase
       </footer>
     </div>
   )

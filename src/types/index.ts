@@ -4,7 +4,8 @@
 /**
  * A song as stored in the Supabase `songs` table and rendered in the UI.
  * `id` is the Supabase UUID primary key (what votes reference). `spotifyId`
- * is the external Spotify track id used for de-duplication.
+ * is the external provider track id used for de-duplication (currently the
+ * Deezer track id; the DB column is named `spotify_id` for historical reasons).
  */
 export interface Song {
   id: string

@@ -2,19 +2,18 @@ import { supabase } from './supabase'
 import { songFromRow, type Song, type SongRow } from '../types'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Spotify integration (frontend side)
+// Catalog (frontend side)
 //
 // WHAT: `fetchEmergingSongs()` returns the list of songs to swipe through.
 //
-// WHY:  The browser never talks to Spotify directly — that would leak the client
-//       secret. Instead it calls our own /api/songs function, which does the
-//       Spotify work server-side and seeds Supabase. This file is the thin
-//       client-side door to that flow.
+// WHY:  The browser never seeds the catalog itself — writing to the read-only
+//       `songs` table needs the service-role key, which must stay server side.
+//       This file is the thin client-side door to that flow.
 //
-// HOW:  Primary path: GET /api/songs (fetches from Spotify + upserts + returns
-//       rows). Fallback path: if that endpoint isn't running (e.g. plain
-//       `npm run dev` with no serverless functions), read whatever songs are
-//       already in Supabase so the UI still has something to show.
+// HOW:  Primary path: GET /api/songs (fetches fresh tracks from Deezer + upserts
+//       + returns rows). Fallback path: if that endpoint isn't running (e.g.
+//       plain `npm run dev` with no serverless functions), read whatever songs
+//       are already in Supabase so the UI still has something to show.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Reads already-seeded songs straight from Supabase (anon, read-only). */
@@ -32,8 +31,8 @@ async function readSeededSongs(): Promise<Song[]> {
 }
 
 /**
- * Returns ~50 emerging songs. Tries the server endpoint first (which refreshes
- * the catalog from Spotify), then falls back to whatever is already stored.
+ * Returns ~50 songs. Tries the server endpoint first (which refreshes the
+ * catalog from Deezer), then falls back to whatever is already stored.
  */
 export async function fetchEmergingSongs(): Promise<Song[]> {
   try {

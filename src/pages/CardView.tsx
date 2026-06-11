@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import SongCard from '../components/SongCard'
-import { fetchEmergingSongs } from '../lib/spotify'
+import { fetchEmergingSongs } from '../lib/catalog'
 import { castVote, hasVotedLocally } from '../lib/voting'
 import type { Song, VoteValue } from '../types'
 

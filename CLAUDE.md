@@ -2,15 +2,16 @@
 
 Majority is a music discovery app where real humans vote on emerging songs. 
 Instead of algorithms deciding what's popular, the community votes. Users swipe 
-through 30-second previews of new songs from Spotify's emerging artist feeds, 
-vote 👍 or 👎, and watch a live leaderboard of what the crowd actually likes.
+through 30-second previews of new-release songs (sourced from Deezer's public 
+feed), vote 👍 or 👎, and watch a live leaderboard of what the crowd actually likes.
 
 ## Stack
 - **Frontend:** React + Vite (TypeScript)
 - **Styling:** Tailwind CSS v4
 - **Backend/Database/Auth:** Supabase (Postgres, anonymous voting)
 - **Deployment:** Vercel
-- **Data:** Spotify Web API (previews + metadata)
+- **Data:** Deezer public API (new releases + 30s previews, no auth). NOTE: pivoted
+  off Spotify — its Web API now requires the app owner to have Premium (403s otherwise).
 
 ## Folder Structure
 src/
@@ -59,7 +60,7 @@ RLS Policy: `INSERT` enabled for anonymous users with ip_hash validation
 ## Completed Tasks
 - Scaffold: Vite + React + TS, Tailwind v4, Supabase client
 - Task 1: Supabase client (`src/lib/supabase.ts`)
-- Task 2: Spotify integration (`api/songs.ts` + `src/lib/spotify.ts`)
+- Task 2: Catalog integration — Deezer (`api/songs.ts` + `src/lib/catalog.ts`)
 - Task 3: Song card UI (`src/components/SongCard.tsx`)
 - Task 4: Vote storage (`src/lib/voting.ts`)
 - Task 5: Leaderboard (`src/components/Leaderboard.tsx`)
@@ -71,17 +72,19 @@ Build MVP: fetch emerging songs from Spotify, display swipeable cards with 30-se
 store votes, show real-time leaderboard.
 
 ### Acceptance Criteria
-- [x] Fetch ~50 songs from Spotify's new releases feed (server-side, via `/api/songs`)
+- [x] Fetch ~50 songs from a new-releases feed (Deezer, server-side via `/api/songs`)
 - [x] Display one song card at a time: album art, title, artist, play button (30-sec preview)
 - [x] Vote buttons (👍 upvote, 👎 downvote) store vote in Supabase
 - [x] Leaderboard view shows top 10 songs sorted by vote count (realtime + polling fallback)
 - [x] Navigation between card view and leaderboard
-- [ ] Deployed to Vercel, live URL working — needs Kevin: secrets + table confirmation
+- [ ] Deployed to Vercel, live URL working — needs Kevin to import repo + set env vars
 
-### Blocked on Kevin (to go live)
-- Paste `SPOTIFY_CLIENT_SECRET` and `SUPABASE_SERVICE_ROLE_KEY` into `.env.local` + Vercel
-- Confirm `songs` + `votes` tables exist in Supabase with RLS enabled
-- (Optional) Enable Realtime on the `votes` table for instant leaderboard updates
+### Status (2026-06-10)
+- Supabase tables created (with an added `votes` SELECT policy for the leaderboard)
+- `SUPABASE_SERVICE_ROLE_KEY` in `.env.local`; catalog seeded — **50 songs, all with previews**
+- Verified end-to-end locally: anon read of songs + anon vote INSERT both work
+- Remaining to go live: `vercel dev` (or deploy) so `/api/songs` runs in-app, then
+  import to Vercel + set the 4 env vars. (Optional) enable Realtime on `votes`.
 
 ## V2 Backlog
 - User profiles / authentication (Supabase Auth via magic link)
@@ -92,15 +95,17 @@ store votes, show real-time leaderboard.
 - Real-time vote sync (WebSocket or polling)
 
 ## Known Gotchas
-- **Spotify previews are mostly null since late 2024** — Spotify removed `preview_url`
-  from most Web API responses. Mitigation: `api/songs.ts` backfills 30s previews from
-  Deezer's public API. Tracks with no preview anywhere are still votable, not playable.
+- **Spotify Web API is paywalled** — it now requires the app owner to have Premium
+  (every endpoint 403s otherwise). Catalog pivoted to Deezer's public API (no auth).
+- **`spotify_id` column now holds a Deezer track id** — kept the column name; it's
+  just the external unique id used for upsert de-duplication.
 - **`songs` is server-seeded** — the anon key is read-only on it (RLS), so seeding runs
   in `api/songs.ts` with the service-role key. Needs `SUPABASE_SERVICE_ROLE_KEY`.
 - Duplicate voting prevention: SHA-256 of a per-browser id stored in `ip_hash` (MVP
   stand-in for real IP hashing — good enough for day 1, not abuse-proof)
-- Spotify rate limits: generous for free tier (~400k req/month) — no issue for MVP
-- RLS row-level security: must explicitly enable policies on both tables
+- Deezer has an informal rate limit (~50 req / 5s); the seeder batches album fetches
+- RLS row-level security: must explicitly enable policies on both tables. The
+  leaderboard also needs a `votes` SELECT policy for anon (added beyond the brief).
 - Realtime: enable replication on `votes` for instant leaderboard; else 8s polling fallback
 
 ## Deploy Target
@@ -108,10 +113,9 @@ store votes, show real-time leaderboard.
 - Env vars needed in Vercel dashboard:
   - `VITE_SUPABASE_URL` (browser)
   - `VITE_SUPABASE_PUBLISHABLE_KEY` (browser)
-  - `SPOTIFY_CLIENT_ID` (server-only)
-  - `SPOTIFY_CLIENT_SECRET` (server-only)
   - `SUPABASE_URL` (server-only)
   - `SUPABASE_SERVICE_ROLE_KEY` (server-only)
+  - (Deezer needs no key; the old `SPOTIFY_*` vars are unused now.)
 
 ## Security Constraints
 - `.env.local` is in `.gitignore` — never hardcode credentials
