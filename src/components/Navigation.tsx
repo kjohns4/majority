@@ -19,13 +19,13 @@ interface NavigationProps {
 }
 
 const TABS: { id: View; label: string }[] = [
-  { id: 'discover', label: '🎧 Discover' },
-  { id: 'leaderboard', label: '🏆 Leaderboard' },
+  { id: 'discover', label: 'Discover' },
+  { id: 'leaderboard', label: 'Leaderboard' },
 ]
 
 export default function Navigation({ view, onChange }: NavigationProps) {
   return (
-    <nav className="mx-auto mb-8 flex w-full max-w-xs gap-1 rounded-full bg-white/5 p-1 ring-1 ring-white/10">
+    <nav className="mx-auto mb-10 flex w-full max-w-xs gap-1 rounded-full bg-inset p-1">
       {TABS.map((tab) => {
         const active = view === tab.id
         return (
@@ -35,10 +35,10 @@ export default function Navigation({ view, onChange }: NavigationProps) {
             onClick={() => onChange(tab.id)}
             aria-current={active ? 'page' : undefined}
             className={
-              'flex-1 rounded-full px-4 py-2 text-sm font-medium transition ' +
+              'flex-1 rounded-full px-4 py-2 text-[15px] tracking-wide transition ' +
               (active
-                ? 'bg-fuchsia-500 text-white shadow'
-                : 'text-white/60 hover:text-white')
+                ? 'bg-card text-ink shadow-sm'
+                : 'text-ink-soft hover:text-ink')
             }
           >
             {tab.label}

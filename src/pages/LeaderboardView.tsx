@@ -7,11 +7,11 @@ import Leaderboard from '../components/Leaderboard'
 export default function LeaderboardView() {
   return (
     <section>
-      <h2 className="mb-1 text-center text-2xl font-bold text-white">
-        Top of the crowd
+      <h2 className="mb-1 text-center text-3xl italic text-ink">
+        weekly global leaders
       </h2>
-      <p className="mb-6 text-center text-sm text-white/40">
-        Ranked by real votes, updating live.
+      <p className="mb-8 text-center text-sm italic text-ink-soft">
+        rankings are determined by user votes
       </p>
       <Leaderboard />
     </section>

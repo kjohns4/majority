@@ -18,14 +18,12 @@ function App() {
   const [view, setView] = useState<View>('discover')
 
   return (
-    <div className="mx-auto flex min-h-full max-w-2xl flex-col px-4 py-8">
-      <header className="mb-6 text-center">
-        <h1 className="text-3xl font-extrabold tracking-tight text-white">
+    <div className="mx-auto flex min-h-full max-w-2xl flex-col px-4 py-12">
+      <header className="mb-8 text-center">
+        <h1 className="text-5xl font-medium italic tracking-tight text-ink">
           Majority
         </h1>
-        <p className="text-sm text-white/50">
-          Music discovery by real people — vote, don't algorithm.
-        </p>
+        <p className="mt-1 text-xl italic text-ink-soft">Your choice</p>
       </header>
 
       <Navigation view={view} onChange={setView} />
@@ -34,8 +32,8 @@ function App() {
         {view === 'discover' ? <CardView /> : <LeaderboardView />}
       </main>
 
-      <footer className="mt-10 text-center text-xs text-white/30">
-        Built with real votes · Deezer previews · Supabase
+      <footer className="mt-12 text-center text-xs tracking-wide text-ink-soft/60">
+        rankings determined by real people
       </footer>
     </div>
   )

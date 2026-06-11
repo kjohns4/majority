@@ -6,7 +6,7 @@ import type { Song, VoteValue } from '../types'
 // SongCard — the heart of Majority
 //
 // WHAT: Renders one song (album art, title, artist), a play/pause button for its
-//       30-second preview, and 👍 / 👎 vote buttons.
+//       30-second preview, and Pass / Like vote buttons.
 //
 // WHY:  This is the core loop: listen, react, vote. Everything else (leaderboard,
 //       nav) exists to support what happens on this card.
@@ -24,7 +24,7 @@ import type { Song, VoteValue } from '../types'
 
 interface SongCardProps {
   song: Song
-  /** Called with +1 (👍) or -1 (👎) when the user votes. */
+  /** Called with +1 (Like) or -1 (Pass) when the user votes. */
   onVote: (vote: VoteValue) => void
 }
 
@@ -93,10 +93,12 @@ export default function SongCard({ song, onVote }: SongCardProps) {
     })()
   }
 
+  const monogram = song.title.trim().charAt(0).toUpperCase()
+
   return (
-    <div className="w-full max-w-sm rounded-3xl bg-white/5 p-6 shadow-2xl ring-1 ring-white/10 backdrop-blur">
-      {/* Album art (with a graceful placeholder if the URL is missing). */}
-      <div className="relative mb-5 aspect-square w-full overflow-hidden rounded-2xl bg-white/10">
+    <div className="w-full max-w-sm rounded-3xl bg-card p-6 shadow-[0_20px_60px_-30px_rgba(74,68,63,0.4)] ring-1 ring-line">
+      {/* Album art (with a soft monogram placeholder if the URL is missing). */}
+      <div className="relative mb-5 aspect-square w-full overflow-hidden rounded-2xl bg-inset">
         {song.albumArtUrl ? (
           <img
             src={song.albumArtUrl}
@@ -104,8 +106,8 @@ export default function SongCard({ song, onVote }: SongCardProps) {
             className="h-full w-full object-cover"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-5xl">
-            🎵
+          <div className="flex h-full w-full items-center justify-center text-6xl italic text-ink-soft/50">
+            {monogram}
           </div>
         )}
 
@@ -121,29 +123,33 @@ export default function SongCard({ song, onVote }: SongCardProps) {
                 ? 'Pause preview'
                 : 'Play preview'
           }
-          className="absolute bottom-3 right-3 flex h-14 w-14 items-center justify-center rounded-full bg-fuchsia-500 text-2xl text-white shadow-lg transition hover:bg-fuchsia-400 disabled:cursor-not-allowed disabled:opacity-40"
+          className="absolute bottom-3 right-3 flex h-14 w-14 items-center justify-center rounded-full bg-card text-ink shadow-md ring-1 ring-line transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
         >
           {status === 'resolving' ? (
-            <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+            <span className="h-5 w-5 animate-spin rounded-full border-2 border-ink/20 border-t-ink" />
           ) : isPlaying ? (
-            '⏸'
+            <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current" aria-hidden="true">
+              <path d="M7 5h3.2v14H7zM13.8 5H17v14h-3.2z" />
+            </svg>
           ) : (
-            '▶'
+            <svg viewBox="0 0 24 24" className="ml-0.5 h-5 w-5 fill-current" aria-hidden="true">
+              <path d="M8 5v14l11-7z" />
+            </svg>
           )}
         </button>
       </div>
 
       {/* Title + artist. truncate keeps long names on one tidy line. */}
-      <h2 className="truncate text-xl font-semibold text-white" title={song.title}>
+      <h2 className="truncate text-2xl text-ink" title={song.title}>
         {song.title}
       </h2>
-      <p className="mb-1 truncate text-white/60" title={song.artist}>
+      <p className="mb-1 truncate text-lg italic text-ink-soft" title={song.artist}>
         {song.artist}
       </p>
 
       {status === 'unavailable' && (
-        <p className="mb-3 text-sm text-amber-400/80">
-          No 30-sec preview available — you can still vote.
+        <p className="mb-3 text-sm italic text-ink-soft/80">
+          No preview available — you can still vote.
         </p>
       )}
 
@@ -160,20 +166,20 @@ export default function SongCard({ song, onVote }: SongCardProps) {
       )}
 
       {/* Vote buttons. */}
-      <div className="mt-4 flex gap-3">
+      <div className="mt-5 flex gap-3">
         <button
           type="button"
           onClick={() => onVote(-1)}
-          className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-white/10 py-3 text-lg font-medium text-white transition hover:bg-rose-500/80"
+          className="flex-1 rounded-2xl bg-sand py-3 text-lg tracking-wide text-ink ring-1 ring-line transition hover:bg-sand-deep"
         >
-          👎 <span>Nah</span>
+          Pass
         </button>
         <button
           type="button"
           onClick={() => onVote(1)}
-          className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-white/10 py-3 text-lg font-medium text-white transition hover:bg-emerald-500/80"
+          className="flex-1 rounded-2xl bg-ink py-3 text-lg tracking-wide text-cream transition hover:opacity-90"
         >
-          👍 <span>Fire</span>
+          Like
         </button>
       </div>
     </div>

@@ -18,7 +18,7 @@ export interface Song {
   createdAt: string
 }
 
-/** A single vote: +1 (👍) or -1 (👎). */
+/** A single vote: +1 (Like) or -1 (Pass). */
 export type VoteValue = 1 | -1
 
 /**

@@ -59,14 +59,14 @@ export default function CardView() {
   }
 
   if (loading) {
-    return <p className="py-10 text-center text-white/50">Loading songs…</p>
+    return <p className="py-12 text-center italic text-ink-soft">Loading songs…</p>
   }
 
   if (error) {
     return (
-      <div className="py-10 text-center text-rose-400">
-        <p>Couldn't load songs: {error}</p>
-        <p className="mt-2 text-sm text-white/40">
+      <div className="py-12 text-center text-ink-soft">
+        <p className="italic">Couldn't load songs: {error}</p>
+        <p className="mt-2 text-sm text-ink-soft/70">
           Make sure the songs table is seeded (see README).
         </p>
       </div>
@@ -76,9 +76,9 @@ export default function CardView() {
   // Reached the end of the deck (or there were no songs to begin with).
   if (!currentSong) {
     return (
-      <div className="py-10 text-center text-white/60">
-        <p className="text-lg">🎉 That's everything for now!</p>
-        <p className="mt-2 text-sm text-white/40">
+      <div className="py-12 text-center text-ink-soft">
+        <p className="text-2xl italic text-ink">That's everything for now.</p>
+        <p className="mt-2 text-sm text-ink-soft/80">
           Check the Leaderboard to see what the crowd picked.
         </p>
       </div>
@@ -89,7 +89,7 @@ export default function CardView() {
     <div className="flex flex-col items-center">
       {/* key={song.id} remounts the card per song, resetting its audio player. */}
       <SongCard key={currentSong.id} song={currentSong} onVote={handleVote} />
-      <p className="mt-4 text-sm text-white/40">
+      <p className="mt-5 text-sm tracking-wide text-ink-soft/70">
         {index + 1} of {songs.length}
       </p>
     </div>

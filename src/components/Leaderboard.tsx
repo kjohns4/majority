@@ -101,17 +101,21 @@ export default function Leaderboard() {
   }, [load])
 
   if (loading) {
-    return <p className="py-10 text-center text-white/50">Loading leaderboard…</p>
+    return (
+      <p className="py-12 text-center italic text-ink-soft">
+        Loading leaderboard…
+      </p>
+    )
   }
 
   if (error) {
-    return <p className="py-10 text-center text-rose-400">Error: {error}</p>
+    return <p className="py-12 text-center italic text-ink-soft">Error: {error}</p>
   }
 
   if (entries.length === 0) {
     return (
-      <p className="py-10 text-center text-white/50">
-        No votes yet — go vote on some songs to start the leaderboard!
+      <p className="py-12 text-center italic text-ink-soft">
+        No votes yet — go vote on some songs to start the leaderboard.
       </p>
     )
   }
@@ -121,9 +125,9 @@ export default function Leaderboard() {
       {entries.map((entry, index) => (
         <li
           key={entry.song.id}
-          className="flex items-center gap-4 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10"
+          className="flex items-center gap-4 rounded-2xl bg-card p-3 ring-1 ring-line"
         >
-          <span className="w-6 shrink-0 text-center text-lg font-bold text-white/40">
+          <span className="w-8 shrink-0 text-center text-2xl italic text-ink-soft">
             {index + 1}
           </span>
           {entry.song.albumArtUrl ? (
@@ -133,20 +137,14 @@ export default function Leaderboard() {
               className="h-12 w-12 shrink-0 rounded-lg object-cover"
             />
           ) : (
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-white/10">
-              🎵
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-inset text-xl italic text-ink-soft/50">
+              {entry.song.title.trim().charAt(0).toUpperCase()}
             </div>
           )}
           <div className="min-w-0 flex-1">
-            <p className="truncate font-medium text-white">{entry.song.title}</p>
-            <p className="truncate text-sm text-white/50">{entry.song.artist}</p>
-          </div>
-          <div className="shrink-0 text-right">
-            <p className="text-lg font-bold text-emerald-400">
-              {entry.score > 0 ? `+${entry.score}` : entry.score}
-            </p>
-            <p className="text-xs text-white/40">
-              👍 {entry.upvotes} · 👎 {entry.downvotes}
+            <p className="truncate text-lg text-ink">{entry.song.title}</p>
+            <p className="truncate text-sm italic text-ink-soft">
+              {entry.song.artist}
             </p>
           </div>
         </li>
