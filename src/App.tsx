@@ -33,7 +33,7 @@ function App() {
       </main>
 
       <footer className="mt-12 text-center text-xs tracking-wide text-ink-soft/60">
-        vote wisely
+        rankings determined by real people
       </footer>
     </div>
   )
