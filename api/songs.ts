@@ -136,6 +136,15 @@ export default async function handler(
     return
   }
 
+  // Seeding does privileged writes, so don't let just anyone trigger it. When
+  // CRON_SECRET is set, Vercel's cron sends `Authorization: Bearer <secret>`;
+  // require it. (If the secret isn't set — e.g. local dev — the check is skipped.)
+  const cronSecret = process.env.CRON_SECRET
+  if (cronSecret && req.headers['authorization'] !== `Bearer ${cronSecret}`) {
+    sendJson(res, { error: 'Unauthorized' }, 401)
+    return
+  }
+
   const supabaseUrl = process.env.SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!supabaseUrl || !serviceRoleKey) {
