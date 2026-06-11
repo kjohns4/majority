@@ -3,7 +3,22 @@
    plugin (see vite.config.ts) scans our files and generates the CSS. */
 @import 'tailwindcss';
 
-/* App-wide defaults. Majority has a dark, music-app feel by default. */
+/* Design tokens. @theme exposes these as CSS variables AND generates matching
+   utilities (e.g. bg-cream, text-ink, font-serif). Majority's look is a soft,
+   minimal, cream "quiet home" palette with a dreamy serif. */
+@theme {
+  --color-cream: #f3eee2; /* page background */
+  --color-card: #fbf8f1; /* raised surfaces: cards, play button */
+  --color-sand: #ece4d5; /* soft buttons */
+  --color-sand-deep: #e3d8c4; /* soft button hover */
+  --color-inset: #e9e1d2; /* recessed surfaces: nav track */
+  --color-ink: #4a443f; /* primary text */
+  --color-ink-soft: #9a9082; /* secondary / muted text */
+  --color-line: rgba(74, 68, 63, 0.08); /* hairline borders */
+
+  --font-serif: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+}
+
 html,
 body,
 #root {
@@ -12,9 +27,17 @@ body,
 
 body {
   margin: 0;
-  background-color: #0a0a0f;
-  color: #f5f5f7;
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--color-cream);
+  /* A soft light bloom up top — barely-there, keeps the cream from feeling flat. */
+  background-image: radial-gradient(
+    120% 80% at 50% -10%,
+    rgba(255, 255, 255, 0.55) 0%,
+    rgba(243, 238, 226, 0) 55%
+  );
+  background-attachment: fixed;
+  color: var(--color-ink-soft);
+  font-family: var(--font-serif);
+  font-size: 18px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
