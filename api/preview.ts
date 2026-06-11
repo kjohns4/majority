@@ -14,34 +14,56 @@
 // HOW:  GET the track from Deezer (public, no key) and return { preview }. We let
 //       the response be cached for 10 minutes — comfortably under the ~15-minute
 //       token lifetime — to avoid re-hitting Deezer for every play.
+//
+// RUNTIME: Node serverless (Vercel's recommended default). The handler uses the
+//          Node `(req, res)` signature — `res.status().json()` actually ends the
+//          response. (A web-standard `(request) => Response` handler would be
+//          ignored here and hang.)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function json(body: unknown, status = 200, cacheSeconds = 0): Response {
-  const headers: Record<string, string> = { 'content-type': 'application/json' }
-  if (cacheSeconds > 0) {
-    headers['cache-control'] = `public, max-age=${cacheSeconds}`
-  }
-  return new Response(JSON.stringify(body), { status, headers })
+import type { IncomingMessage, ServerResponse } from 'node:http'
+
+// Vercel's Node runtime augments the request with a parsed `query` object.
+type VercelRequest = IncomingMessage & { query: Record<string, string | string[]> }
+type VercelResponse = ServerResponse & {
+  status(code: number): VercelResponse
+  json(body: unknown): void
 }
 
-export default async function handler(request: Request): Promise<Response> {
-  const trackId = new URL(request.url).searchParams.get('trackId')
+function send(
+  res: VercelResponse,
+  body: unknown,
+  status = 200,
+  cacheSeconds = 0,
+): void {
+  if (cacheSeconds > 0) {
+    res.setHeader('Cache-Control', `public, max-age=${cacheSeconds}`)
+  }
+  res.status(status).json(body)
+}
+
+export default async function handler(
+  req: VercelRequest,
+  res: VercelResponse,
+): Promise<void> {
+  const raw = req.query.trackId
+  const trackId = Array.isArray(raw) ? raw[0] : raw
   // trackId is a Deezer numeric id; reject anything else before calling out.
   if (!trackId || !/^\d+$/.test(trackId)) {
-    return json({ error: 'Missing or invalid trackId' }, 400)
+    return send(res, { error: 'Missing or invalid trackId' }, 400)
   }
 
   try {
-    const res = await fetch(`https://api.deezer.com/track/${trackId}`)
-    if (!res.ok) {
-      return json({ error: `Deezer track request failed (${res.status})` }, 502)
+    const upstream = await fetch(`https://api.deezer.com/track/${trackId}`)
+    if (!upstream.ok) {
+      return send(res, { error: `Deezer track request failed (${upstream.status})` }, 502)
     }
-    const data = (await res.json()) as { preview?: string | null }
+    const data = (await upstream.json()) as { preview?: string | null }
     // 10-minute cache: a fresh token is valid ~15 min, so callers always get a
     // URL with several minutes of life left.
-    return json({ preview: data.preview ?? null }, 200, 600)
+    return send(res, { preview: data.preview ?? null }, 200, 600)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
-    return json({ error: message }, 502)
+    return send(res, { error: message }, 502)
   }
 }

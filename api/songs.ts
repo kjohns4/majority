@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { SongRow } from '../src/types/index.ts'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -24,6 +25,11 @@ import type { SongRow } from '../src/types/index.ts'
 //       first track that has a preview → top up from chart/0/tracks if we came up
 //       short → Supabase upsert (onConflict spotify_id, so re-running is
 //       idempotent; the column just holds the external Deezer track id now).
+//
+// RUNTIME: Node serverless (Vercel's recommended default). Uses the Node
+//          `(req, res)` signature so `res.status().json()` actually ends the
+//          response. (A web-standard `(request) => Response` handler would be
+//          ignored here and the function would hang until it times out.)
 // ─────────────────────────────────────────────────────────────────────────────
 
 const DEEZER = 'https://api.deezer.com'
@@ -56,11 +62,15 @@ interface DeezerReleaseAlbum {
   artist: DeezerArtist
 }
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json' },
-  })
+// Vercel's Node runtime augments these with helpers; type just what we use.
+type VercelRequest = IncomingMessage
+type VercelResponse = ServerResponse & {
+  status(code: number): VercelResponse
+  json(body: unknown): void
+}
+
+function send(res: VercelResponse, body: unknown, status = 200): void {
+  res.status(status).json(body)
 }
 
 async function deezerGet<T>(path: string): Promise<T> {
@@ -126,9 +136,12 @@ async function fromCharts(): Promise<NewSong[]> {
     .map((t) => toSong(t, t.album?.cover_xl ?? t.album?.cover_big ?? null))
 }
 
-export default async function handler(request: Request): Promise<Response> {
-  if (request.method !== 'GET' && request.method !== 'POST') {
-    return json({ error: 'Method not allowed' }, 405)
+export default async function handler(
+  req: VercelRequest,
+  res: VercelResponse,
+): Promise<void> {
+  if (req.method !== 'GET' && req.method !== 'POST') {
+    return send(res, { error: 'Method not allowed' }, 405)
   }
 
   const supabaseUrl = process.env.SUPABASE_URL
@@ -138,7 +151,7 @@ export default async function handler(request: Request): Promise<Response> {
       !supabaseUrl && 'SUPABASE_URL',
       !serviceRoleKey && 'SUPABASE_SERVICE_ROLE_KEY',
     ].filter(Boolean)
-    return json({ error: `Server is missing env vars: ${missing.join(', ')}` }, 500)
+    return send(res, { error: `Server is missing env vars: ${missing.join(', ')}` }, 500)
   }
 
   try {
@@ -157,7 +170,7 @@ export default async function handler(request: Request): Promise<Response> {
     }
 
     if (songs.length === 0) {
-      return json({ error: 'No songs with previews found upstream.' }, 502)
+      return send(res, { error: 'No songs with previews found upstream.' }, 502)
     }
 
     // Upsert (service role bypasses the read-only RLS on songs). onConflict
@@ -169,12 +182,12 @@ export default async function handler(request: Request): Promise<Response> {
       .select()
 
     if (error) {
-      return json({ error: `Supabase upsert failed: ${error.message}` }, 500)
+      return send(res, { error: `Supabase upsert failed: ${error.message}` }, 500)
     }
 
-    return json({ songs: data as SongRow[] })
+    return send(res, { songs: data as SongRow[] })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
-    return json({ error: message }, 502)
+    return send(res, { error: message }, 502)
   }
 }
