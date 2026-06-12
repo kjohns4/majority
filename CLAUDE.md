@@ -123,6 +123,14 @@ store votes, show real-time leaderboard.
 - **Deezer preview URLs expire (~15 min)** — signed `hdnea=exp` tokens. Don't trust the
   stored `preview_url`; the client resolves a fresh one at play time via `/api/preview`
   (JSONP fallback for plain `npm run dev`).
+- **Mobile browsers repaint the cream palette brown — two separate mechanisms.**
+  (1) iOS Safari in Dark Mode auto-darkens pages that don't declare a color scheme →
+  fixed via `<meta name="color-scheme" content="light">` + `html { color-scheme: light }`.
+  (2) Firefox for iOS's "Website Dark Mode" menu toggle injects the Dark Reader library,
+  which *ignores* `color-scheme` → fixed via `<meta name="darkreader-lock">` (Dark Reader's
+  supported opt-out; also disables the desktop Dark Reader extension on the site). Both
+  metas live in `index.html`. If a dark tint reappears, check which mechanism before
+  reaching for either fix.
 - Duplicate voting prevention: SHA-256 of a per-browser id stored in `ip_hash` (MVP
   stand-in for real IP hashing — good enough for day 1, not abuse-proof)
 - Deezer has an informal rate limit (~50 req / 5s); the seeder batches album fetches
