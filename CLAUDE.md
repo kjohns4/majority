@@ -3,7 +3,19 @@
 Majority is a music discovery app where real humans vote on emerging songs. 
 Instead of algorithms deciding what's popular, the community votes. Users swipe 
 through 30-second previews of new-release songs (sourced from Deezer's public 
-feed), vote 👍 or 👎, and watch a live leaderboard of what the crowd actually likes.
+feed), Pass or Like, and watch a live leaderboard of what the crowd actually likes.
+
+**Live:** https://majority-eight.vercel.app · **Repo:** github.com/kjohns4/majority
+
+## Architecture (one writer, many fast readers)
+```
+Daily cron ──Bearer CRON_SECRET──▶ /api/songs ──▶ Deezer ──▶ Supabase upsert   (write, once/day)
+Every visitor ───────────────────▶ Supabase SELECT (7-day window)              (read, instant)
+Play a track ────────────────────▶ /api/preview ──▶ fresh Deezer preview URL   (per play)
+Vote ────────────────────────────▶ Supabase insert (anon, RLS)
+```
+- The client never calls `/api/songs` on page load — it reads songs straight from Supabase.
+- `/api/songs` is the seeding endpoint, run on a schedule (Vercel Cron) and secured by `CRON_SECRET`.
 
 ## Stack
 - **Frontend:** React + Vite (TypeScript)
@@ -14,22 +26,28 @@ feed), vote 👍 or 👎, and watch a live leaderboard of what the crowd actuall
   off Spotify — its Web API now requires the app owner to have Premium (403s otherwise).
 
 ## Folder Structure
+```
+api/
+  songs.ts            # Serverless (Node): Deezer new releases -> Supabase upsert (SEEDER, cron)
+  preview.ts          # Serverless (Node): fresh signed Deezer preview URL for a track
 src/
-components/
-SongCard.tsx        # Display song + preview player + vote buttons
-Leaderboard.tsx     # Top 10 songs sorted by vote count
-Navigation.tsx      # Toggle between card view and leaderboard
-pages/
-CardView.tsx
-LeaderboardView.tsx
-lib/
-supabase.ts         # Supabase client init
-spotify.ts          # Spotify API calls
-types/
-index.ts
-App.tsx
-main.tsx
-.env.local              # Supabase URL, key, Spotify Client ID
+  components/
+    SongCard.tsx      # Cover art + full-cover play/pause + Pass/Like (locked until played)
+    Leaderboard.tsx   # Top 10 by score; displays rank only (no vote counts)
+    Navigation.tsx    # Discover / Leaderboard toggle
+  pages/
+    CardView.tsx      # Discover deck manager
+    LeaderboardView.tsx
+  lib/
+    supabase.ts       # Supabase anon client init
+    catalog.ts        # fetchEmergingSongs (Supabase read) + resolvePreview (fresh URL)
+    voting.ts         # castVote: insert {song_id, vote, ip_hash}
+  types/index.ts      # shared types + snake_case->camelCase row mapper
+vercel.json           # Cron: daily POST/GET to /api/songs
+.env.local            # Supabase URL/keys, service-role key (git-ignored)
+```
+NOTE: Vercel's Node runtime invokes /api functions as `(req, res)` — NOT the web
+`Request`/`Response` signature. Both functions write via `res`, not by returning.
 
 ## Supabase Schema
 
@@ -57,39 +75,41 @@ created_at (TIMESTAMP)
 
 RLS Policy: `INSERT` enabled for anonymous users with ip_hash validation
 
-## Completed Tasks
-- Scaffold: Vite + React + TS, Tailwind v4, Supabase client
-- Task 1: Supabase client (`src/lib/supabase.ts`)
-- Task 2: Catalog integration — Deezer (`api/songs.ts` + `src/lib/catalog.ts`)
-- Task 3: Song card UI (`src/components/SongCard.tsx`)
-- Task 4: Vote storage (`src/lib/voting.ts`)
-- Task 5: Leaderboard (`src/components/Leaderboard.tsx`)
-- Task 6: Navigation + pages + App wiring
-- Task 7: Styling polish
-
-## Current Task
-Build MVP: fetch emerging songs from Spotify, display swipeable cards with 30-sec previews, 
-store votes, show real-time leaderboard.
+## Status — MVP shipped & live (2026-06-10)
+All acceptance criteria met; deployed to production at https://majority-eight.vercel.app
 
 ### Acceptance Criteria
 - [x] Fetch ~50 songs from a new-releases feed (Deezer, server-side via `/api/songs`)
 - [x] Display one song card at a time: album art, title, artist, play button (30-sec preview)
-- [x] Vote buttons (👍 upvote, 👎 downvote) store vote in Supabase
-- [x] Leaderboard view shows top 10 songs sorted by vote count (realtime + polling fallback)
+- [x] Vote buttons (Pass / Like) store vote in Supabase
+- [x] Leaderboard view shows top 10 by vote count (realtime + polling fallback)
 - [x] Navigation between card view and leaderboard
 - [x] Deployed to Vercel, live URL working — **https://majority-eight.vercel.app**
 
-### Status (2026-06-11)
-- **Live on Vercel** at https://majority-eight.vercel.app (auto-deploys on push to `main`);
-  all 4 env vars set in Production (`/api/songs` returns 200 with 50 rows, so the
-  service-role key + Supabase URL are wired up correctly).
+### Status (2026-06-12)
+- **Live on Vercel** at https://majority-eight.vercel.app — **auto-deploys on push to
+  `main`** (verified repeatedly on 2026-06-11/12); env vars set in Production.
 - Supabase tables created (with an added `votes` SELECT policy for the leaderboard).
 - Catalog seeded — **50 songs, all with previews**.
-- Verified end-to-end (local `vercel dev` + production): `/api/preview` 200, `/api/songs`
-  200/50 songs, anon read of songs + anon vote INSERT both work.
+- Verified end-to-end (local `vercel dev` + production): `/api/preview` 200, anon read
+  of songs + anon vote INSERT both work.
+- **Merged (2026-06-12):** `feat/majority-mvp` fully into `main` — restored the
+  full-cover play/pause + listen-to-vote lock, daily cron reseeding (`vercel.json` +
+  `CRON_SECRET` gate on `/api/songs`), and read-only Discover (client reads Supabase
+  directly; `/api/songs` is cron-only now).
 - **Fixed (2026-06-11):** `/api/songs` and `/api/preview` were timing out / 500ing —
   see the "API handlers must use Node `(req, res)` signature" gotcha below.
 - (Optional) enable Realtime on `votes` for instant leaderboard (else 8s polling fallback).
+
+### Completed work
+- Tasks 1–7: Supabase client, catalog, SongCard, voting, leaderboard, nav, styling
+- Task 8: deployed to Vercel, prod env vars set
+- Catalog pivot Spotify → Deezer (Spotify API now needs owner Premium)
+- Preview-URL fix: resolve fresh signed URLs at play time (`/api/preview`)
+- Rotation: 7-day Discover read-window (Option D), no deletes
+- Daily Vercel Cron reseeds the catalog; `/api/songs` secured by `CRON_SECRET`
+- UI: minimalist cream redesign, dreamy serif, zero emojis
+- UX: full-cover play/pause; voting locked until the user has listened
 
 ## V2 Backlog
 - User profiles / authentication (Supabase Auth via magic link)
@@ -97,7 +117,9 @@ store votes, show real-time leaderboard.
 - Genre / mood filters
 - Artist dashboard (see how many votes your song got)
 - Weekly "most voted" email digest
-- Real-time vote sync (WebSocket or polling)
+- Vote-aware pruning (delete unvoted stale songs) if the table grows large
+- Stronger listen gate (require N seconds played, not just pressing play)
+- Real-time vote sync is DONE (Supabase Realtime + 8s polling fallback)
 
 ## Known Gotchas
 - **API handlers must use the Node `(req, res)` signature** — `api/songs.ts` and
@@ -139,19 +161,24 @@ store votes, show real-time leaderboard.
 - Realtime: enable replication on `votes` for instant leaderboard; else 8s polling fallback
 
 ## Deploy Target
-- **Vercel** (auto-deploy on push to main)
-- Env vars needed in Vercel dashboard:
+- **Vercel** — auto-deploys on push to `main`. Project: `kevins-projects-dea10263/majority`
+  (manual deploys also work: `vercel deploy --prod --scope kevins-projects-dea10263`).
+- Env vars (set in Vercel project):
   - `VITE_SUPABASE_URL` (browser)
   - `VITE_SUPABASE_PUBLISHABLE_KEY` (browser)
   - `SUPABASE_URL` (server-only)
   - `SUPABASE_SERVICE_ROLE_KEY` (server-only)
-  - (Deezer needs no key; the old `SPOTIFY_*` vars are unused now.)
+  - `CRON_SECRET` (server-only; gates `/api/songs` and authenticates the daily cron)
+  - (Deezer needs no key; the old `SPOTIFY_*` vars are gone.)
+- Cron: `vercel.json` runs `/api/songs` daily at `0 8 * * *` (Hobby: ~once/day, may slip ~1h).
 
 ## Security Constraints
 - `.env.local` is in `.gitignore` — never hardcode credentials
-- Spotify Client Secret: store in .env.local only, never in frontend code (it's sensitive)
-- All user input validated before Supabase INSERT
-- Supabase RLS enforced: anonymous voting is restricted by ip_hash policy
+- Secrets are server-only (never `VITE_`-prefixed): `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`.
+  The browser only holds the RLS-restricted anon key.
+- `/api/songs` does privileged writes — requires `Authorization: Bearer $CRON_SECRET` in prod
+- All user input validated before Supabase INSERT (vote ∈ {1,-1}, song_id present)
+- Supabase RLS enforced: anon can read songs + insert votes (ip_hash required); nothing else
 - No sensitive logic exposed to client
 
 ## Commit Conventions

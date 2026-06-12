@@ -6,14 +6,11 @@ import { songFromRow, type Song, type SongRow } from '../types'
 //
 // WHAT: `fetchEmergingSongs()` returns the list of songs to swipe through.
 //
-// WHY:  The browser never seeds the catalog itself — writing to the read-only
-//       `songs` table needs the service-role key, which must stay server side.
-//       This file is the thin client-side door to that flow.
-//
-// HOW:  Primary path: GET /api/songs (fetches fresh tracks from Deezer + upserts
-//       + returns rows). Fallback path: if that endpoint isn't running (e.g.
-//       plain `npm run dev` with no serverless functions), read whatever songs
-//       are already in Supabase so the UI still has something to show.
+// WHY:  The browser never seeds the catalog — writing to the read-only `songs`
+//       table needs the service-role key, which must stay server side. Seeding is
+//       a separate concern (the /api/songs function, run on a schedule). The
+//       client just READS, which keeps Discover instant: a single fast Supabase
+//       query, with no dependency on the slower seeding function at page load.
 //
 //       Rotation (Option D): we never delete songs — the table keeps full
 //       history so the leaderboard stays intact. Discover just *reads a window*:
@@ -24,9 +21,10 @@ import { songFromRow, type Song, type SongRow } from '../types'
 /** How far back Discover looks. Older songs stay in the DB but aren't swiped. */
 const DISCOVER_WINDOW_DAYS = 7
 
-function discoverCutoff(): { iso: string; ms: number } {
-  const ms = Date.now() - DISCOVER_WINDOW_DAYS * 24 * 60 * 60 * 1000
-  return { iso: new Date(ms).toISOString(), ms }
+function discoverCutoffIso(): string {
+  return new Date(
+    Date.now() - DISCOVER_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+  ).toISOString()
 }
 
 /** Reads recently-seeded songs straight from Supabase (anon, read-only). */
@@ -34,7 +32,7 @@ async function readSeededSongs(): Promise<Song[]> {
   const { data, error } = await supabase
     .from('songs')
     .select('*')
-    .gte('created_at', discoverCutoff().iso)
+    .gte('created_at', discoverCutoffIso())
     .order('created_at', { ascending: false })
     .limit(50)
 
@@ -114,35 +112,10 @@ export async function resolvePreview(trackId: string): Promise<string | null> {
 }
 
 /**
- * Returns ~50 songs. Tries the server endpoint first (which refreshes the
- * catalog from Deezer), then falls back to whatever is already stored.
+ * Returns the songs to swipe through: a fast, windowed read from Supabase. The
+ * catalog is populated separately by the /api/songs seeding function, so this
+ * stays instant and never blocks on a Deezer round-trip.
  */
 export async function fetchEmergingSongs(): Promise<Song[]> {
-  let songs: Song[] | null = null
-
-  try {
-    const res = await fetch('/api/songs')
-    // In plain `vite dev` there's no function, so the dev server returns the
-    // index.html (200, text/html). Guard on the content type, not just res.ok.
-    const contentType = res.headers.get('content-type') ?? ''
-    if (res.ok && contentType.includes('application/json')) {
-      const body = (await res.json()) as { songs?: SongRow[]; error?: string }
-      if (body.error) throw new Error(body.error)
-      if (body.songs && body.songs.length > 0) {
-        songs = body.songs.map(songFromRow)
-      }
-    }
-  } catch {
-    // Swallow and fall through to the Supabase fallback below.
-  }
-
-  if (!songs) {
-    songs = await readSeededSongs()
-  }
-
-  // Apply the Discover window uniformly, whichever path produced the songs: a
-  // re-seeded track keeps its original created_at, so an album that lingers in
-  // Deezer's new-releases feed for >7 days correctly ages out of Discover.
-  const { ms: cutoffMs } = discoverCutoff()
-  return songs.filter((s) => new Date(s.createdAt).getTime() >= cutoffMs)
+  return readSeededSongs()
 }

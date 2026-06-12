@@ -1,36 +1,31 @@
-import { createClient } from '@supabase/supabase-js'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { createClient } from '@supabase/supabase-js'
 import type { SongRow } from '../src/types/index.ts'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// /api/songs  — Vercel Serverless Function (Node runtime, web-standard handler)
+// /api/songs  — Vercel Serverless Function (Node runtime)
 //
 // WHAT: Fetches a batch of fresh songs from Deezer (each with a real 30-second
-//       preview), upserts them into the Supabase `songs` table, and returns the
-//       saved rows (each with its Supabase UUID).
+//       preview) and upserts them into the Supabase `songs` table. This is the
+//       SEEDING endpoint — it's meant to be run periodically (e.g. a daily cron),
+//       not on every page load. The client reads songs straight from Supabase.
 //
-// WHY:  Two things: (1) Deezer's public API needs no key, so there's no secret to
-//       protect on the catalog side — but (2) the `songs` table is read-only for
-//       anonymous users (RLS), so seeding it still requires the Supabase
-//       service-role key, which must stay server side. This function is where
-//       that privileged write happens, off the client.
+// WHY:  Deezer's public API needs no key, but the `songs` table is read-only for
+//       anonymous users (RLS), so seeding requires the Supabase service-role key,
+//       which must stay server side. That privileged write happens here.
 //
-//       (We originally used Spotify here, but Spotify's Web API now requires the
-//       app owner to hold a Premium subscription — every endpoint 403s without
-//       it. Deezer has no such gate and reliably returns previews, so it's the
-//       catalog source.)
+//       (Spotify's Web API now requires the app owner to hold Premium — every
+//       endpoint 403s without it — so Deezer is the catalog source.)
 //
-// HOW:  editorial/0/releases gives genuinely new-release albums → fetch each
-//       album's tracks (batched, to respect Deezer's rate limit) and take the
-//       first track that has a preview → top up from chart/0/tracks if we came up
-//       short → Supabase upsert (onConflict spotify_id, so re-running is
-//       idempotent; the column just holds the external Deezer track id now).
+// HOW:  editorial/0/releases → fetch each album's tracks (batched) → take the
+//       first previewable track → top up from chart/0/tracks → Supabase upsert
+//       (onConflict spotify_id, idempotent; the column holds the Deezer track id).
 //
-// RUNTIME: Node serverless (Vercel's recommended default). Uses the Node
-//          `(req, res)` signature so `res.status().json()` actually ends the
-//          response. (A web-standard `(request) => Response` handler would be
-//          ignored here and the function would hang until it times out.)
+// NOTE: Vercel's Node runtime calls functions with (req, res) — NOT the web
+//       Request/Response signature. We write JSON via res, not by returning.
 // ─────────────────────────────────────────────────────────────────────────────
+
+export const config = { maxDuration: 60 }
 
 const DEEZER = 'https://api.deezer.com'
 const TARGET_COUNT = 50
@@ -62,15 +57,10 @@ interface DeezerReleaseAlbum {
   artist: DeezerArtist
 }
 
-// Vercel's Node runtime augments these with helpers; type just what we use.
-type VercelRequest = IncomingMessage
-type VercelResponse = ServerResponse & {
-  status(code: number): VercelResponse
-  json(body: unknown): void
-}
-
-function send(res: VercelResponse, body: unknown, status = 200): void {
-  res.status(status).json(body)
+function sendJson(res: ServerResponse, body: unknown, status = 200): void {
+  res.statusCode = status
+  res.setHeader('content-type', 'application/json')
+  res.end(JSON.stringify(body))
 }
 
 async function deezerGet<T>(path: string): Promise<T> {
@@ -137,11 +127,22 @@ async function fromCharts(): Promise<NewSong[]> {
 }
 
 export default async function handler(
-  req: VercelRequest,
-  res: VercelResponse,
+  req: IncomingMessage,
+  res: ServerResponse,
 ): Promise<void> {
-  if (req.method !== 'GET' && req.method !== 'POST') {
-    return send(res, { error: 'Method not allowed' }, 405)
+  const method = req.method ?? 'GET'
+  if (method !== 'GET' && method !== 'POST') {
+    sendJson(res, { error: 'Method not allowed' }, 405)
+    return
+  }
+
+  // Seeding does privileged writes, so don't let just anyone trigger it. When
+  // CRON_SECRET is set, Vercel's cron sends `Authorization: Bearer <secret>`;
+  // require it. (If the secret isn't set — e.g. local dev — the check is skipped.)
+  const cronSecret = process.env.CRON_SECRET
+  if (cronSecret && req.headers['authorization'] !== `Bearer ${cronSecret}`) {
+    sendJson(res, { error: 'Unauthorized' }, 401)
+    return
   }
 
   const supabaseUrl = process.env.SUPABASE_URL
@@ -151,7 +152,8 @@ export default async function handler(
       !supabaseUrl && 'SUPABASE_URL',
       !serviceRoleKey && 'SUPABASE_SERVICE_ROLE_KEY',
     ].filter(Boolean)
-    return send(res, { error: `Server is missing env vars: ${missing.join(', ')}` }, 500)
+    sendJson(res, { error: `Server is missing env vars: ${missing.join(', ')}` }, 500)
+    return
   }
 
   try {
@@ -170,7 +172,8 @@ export default async function handler(
     }
 
     if (songs.length === 0) {
-      return send(res, { error: 'No songs with previews found upstream.' }, 502)
+      sendJson(res, { error: 'No songs with previews found upstream.' }, 502)
+      return
     }
 
     // Upsert (service role bypasses the read-only RLS on songs). onConflict
@@ -182,12 +185,13 @@ export default async function handler(
       .select()
 
     if (error) {
-      return send(res, { error: `Supabase upsert failed: ${error.message}` }, 500)
+      sendJson(res, { error: `Supabase upsert failed: ${error.message}` }, 500)
+      return
     }
 
-    return send(res, { songs: data as SongRow[] })
+    sendJson(res, { songs: data as SongRow[], count: (data ?? []).length })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
-    return send(res, { error: message }, 502)
+    sendJson(res, { error: message }, 502)
   }
 }
