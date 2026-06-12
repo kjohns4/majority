@@ -77,14 +77,19 @@ store votes, show real-time leaderboard.
 - [x] Vote buttons (👍 upvote, 👎 downvote) store vote in Supabase
 - [x] Leaderboard view shows top 10 songs sorted by vote count (realtime + polling fallback)
 - [x] Navigation between card view and leaderboard
-- [ ] Deployed to Vercel, live URL working — needs Kevin to import repo + set env vars
+- [x] Deployed to Vercel, live URL working — **https://majority-eight.vercel.app**
 
-### Status (2026-06-10)
-- Supabase tables created (with an added `votes` SELECT policy for the leaderboard)
-- `SUPABASE_SERVICE_ROLE_KEY` in `.env.local`; catalog seeded — **50 songs, all with previews**
-- Verified end-to-end locally: anon read of songs + anon vote INSERT both work
-- Remaining to go live: `vercel dev` (or deploy) so `/api/songs` runs in-app, then
-  import to Vercel + set the 4 env vars. (Optional) enable Realtime on `votes`.
+### Status (2026-06-11)
+- **Live on Vercel** at https://majority-eight.vercel.app (auto-deploys on push to `main`);
+  all 4 env vars set in Production (`/api/songs` returns 200 with 50 rows, so the
+  service-role key + Supabase URL are wired up correctly).
+- Supabase tables created (with an added `votes` SELECT policy for the leaderboard).
+- Catalog seeded — **50 songs, all with previews**.
+- Verified end-to-end (local `vercel dev` + production): `/api/preview` 200, `/api/songs`
+  200/50 songs, anon read of songs + anon vote INSERT both work.
+- **Fixed (2026-06-11):** `/api/songs` and `/api/preview` were timing out / 500ing —
+  see the "API handlers must use Node `(req, res)` signature" gotcha below.
+- (Optional) enable Realtime on `votes` for instant leaderboard (else 8s polling fallback).
 
 ## V2 Backlog
 - User profiles / authentication (Supabase Auth via magic link)
@@ -95,6 +100,17 @@ store votes, show real-time leaderboard.
 - Real-time vote sync (WebSocket or polling)
 
 ## Known Gotchas
+- **API handlers must use the Node `(req, res)` signature** — `api/songs.ts` and
+  `api/preview.ts` run on Vercel's Node serverless runtime (no Edge config), so they get
+  invoked as `(req, res)`, *not* as web-standard `(request: Request) => Response`. Writing
+  them web-style silently breaks them: a returned `Response` is ignored (→ function hangs
+  until timeout) and `new URL(req.url)` throws because `req.url` is the relative path. Use
+  `req.query` for params and `res.status().json()` to respond. (This was the 2026-06-11
+  timeout/500 bug.)
+- **`vercel dev` doesn't auto-load server-only vars from `.env.local`** — only Vite's
+  `VITE_*` vars get picked up. `/api/songs` needs `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`
+  in the function's env, so locally launch with them exported (`set -a; . ./.env.local; set +a;
+  vercel dev`) or it returns a clean 500. In Production they're set in the Vercel dashboard.
 - **Spotify Web API is paywalled** — it now requires the app owner to have Premium
   (every endpoint 403s otherwise). Catalog pivoted to Deezer's public API (no auth).
 - **`spotify_id` column now holds a Deezer track id** — kept the column name; it's
