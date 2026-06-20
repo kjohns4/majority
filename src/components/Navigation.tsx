@@ -21,11 +21,12 @@ interface NavigationProps {
 const TABS: { id: View; label: string }[] = [
   { id: 'discover', label: 'Discover' },
   { id: 'leaderboard', label: 'Leaderboard' },
+  { id: 'liked', label: 'Liked' },
 ]
 
 export default function Navigation({ view, onChange }: NavigationProps) {
   return (
-    <nav className="mx-auto mb-10 flex w-full max-w-xs gap-1 rounded-full bg-inset p-1">
+    <nav className="mx-auto mb-10 flex w-full max-w-sm gap-1 rounded-full bg-inset p-1">
       {TABS.map((tab) => {
         const active = view === tab.id
         return (

@@ -32,8 +32,8 @@ export interface LeaderboardEntry {
   score: number
 }
 
-/** The two top-level screens the user can navigate between. */
-export type View = 'discover' | 'leaderboard'
+/** The top-level screens the user can navigate between. */
+export type View = 'discover' | 'leaderboard' | 'liked'
 
 /**
  * Raw row shape returned by Supabase for the `songs` table (snake_case).

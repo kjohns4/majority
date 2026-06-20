@@ -2,16 +2,17 @@ import { useState } from 'react'
 import Navigation from './components/Navigation'
 import CardView from './pages/CardView'
 import LeaderboardView from './pages/LeaderboardView'
+import LikedSongsView from './pages/LikedSongsView'
 import type { View } from './types'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // App — top-level shell
 //
-// WHAT: Renders the header, the Discover/Leaderboard toggle, and whichever page
-//       is active.
+// WHAT: Renders the header, the Discover / Leaderboard / Liked toggle, and
+//       whichever page is active.
 //
 // WHY:  One place owns the single piece of cross-screen state (which view is
-//       showing) and passes it down. Simple, no router needed for two screens.
+//       showing) and passes it down. Simple, no router needed for a few screens.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function App() {
@@ -29,7 +30,9 @@ function App() {
       <Navigation view={view} onChange={setView} />
 
       <main className="flex-1">
-        {view === 'discover' ? <CardView /> : <LeaderboardView />}
+        {view === 'discover' && <CardView />}
+        {view === 'leaderboard' && <LeaderboardView />}
+        {view === 'liked' && <LikedSongsView />}
       </main>
 
       <footer className="mt-12 text-center text-xs tracking-wide text-ink-soft/60">
