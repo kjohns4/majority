@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import SongCard from '../components/SongCard'
 import { fetchEmergingSongs } from '../lib/catalog'
 import { castVote, hasVotedLocally } from '../lib/voting'
+import { addLikedSong } from '../hooks/useLikedSongs'
 import type { Song, VoteValue } from '../types'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -51,6 +52,9 @@ export default function CardView() {
 
   function handleVote(vote: VoteValue) {
     if (!currentSong) return
+    // A Like also goes to the user's local "Liked Songs" list (snapshot now, so
+    // it survives the deck advancing past this card).
+    if (vote === 1) addLikedSong(currentSong)
     // Persist in the background; advance the UI right away.
     void castVote(currentSong.id, vote).catch((err) => {
       console.error('Vote failed:', err)
