@@ -111,6 +111,26 @@ All acceptance criteria met; deployed to production at https://majority-eight.ve
 - UI: minimalist cream redesign, dreamy serif, zero emojis
 - UX: full-cover play/pause; voting locked until the user has listened
 
+## Current task — Liked Songs (localStorage MVP, 2026-06-19)
+A "Liked Songs" tab where users see every song they've Liked in this browser. Liking a
+song (vote = 1) saves a compact snapshot to localStorage; the tab lists them newest-first
+and each row plays the 30s preview (fresh signed URL via `/api/preview`).
+
+**Core constraint:** client-side only — clearing the cache loses the list. Acceptable for
+MVP; the UI is honest about it. localStorage is read back as *untrusted* (safe JSON parse).
+
+### What Claude Code can do autonomously
+- [x] `src/hooks/useLikedSongs.ts` — localStorage read/write (safe parse, dedupe by id, newest-first)
+- [ ] Persist a snapshot `{songId, spotifyId, title, artist, albumArtUrl, likedAt}` when a Like is cast (CardView)
+- [ ] `LikedSongsView` page — lists liked songs newest-first, each row plays its preview
+- [ ] Add a "Liked" tab to `Navigation` + route it in `App` (extend the `View` type)
+- [ ] Typecheck + build green; one PR per atomic commit
+
+### What the engineer needs to do
+- Nothing new server-side: no schema, env var, or Vercel config change — the feature is
+  100% client-side and reuses the existing `/api/preview` proxy.
+- Review/merge the PRs; production auto-deploys on merge to `main`.
+
 ## V2 Backlog
 - User profiles / authentication (Supabase Auth via magic link)
 - Follow tastemakers (curators with good voting history)
@@ -153,6 +173,13 @@ All acceptance criteria met; deployed to production at https://majority-eight.ve
   supported opt-out; also disables the desktop Dark Reader extension on the site). Both
   metas live in `index.html`. If a dark tint reappears, check which mechanism before
   reaching for either fix.
+- **Liked Songs is a denormalized localStorage snapshot** — each entry stores its own
+  `{songId, spotifyId, title, artist, albumArtUrl, likedAt}` so the tab renders with zero network.
+  It is *not* re-fetched from Supabase, so it won't reflect later edits to the song row;
+  that's fine for an MVP. Read it back defensively (wrap `JSON.parse` in try/catch and
+  drop malformed entries) — localStorage is user-writable and untrusted. Key:
+  `majority:liked-songs`. Preview URLs are never stored (they expire); rows resolve a
+  fresh one via `/api/preview` at play time, exactly like SongCard.
 - Duplicate voting prevention: SHA-256 of a per-browser id stored in `ip_hash` (MVP
   stand-in for real IP hashing — good enough for day 1, not abuse-proof)
 - Deezer has an informal rate limit (~50 req / 5s); the seeder batches album fetches
