@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Analytics } from '@vercel/analytics/react'
 import Navigation from './components/Navigation'
 import CardView from './pages/CardView'
 import LeaderboardView from './pages/LeaderboardView'
@@ -38,6 +39,8 @@ function App() {
       <footer className="mt-12 text-center text-xs tracking-wide text-ink-soft/60">
         rankings determined by you
       </footer>
+
+      <Analytics />
     </div>
   )
 }
