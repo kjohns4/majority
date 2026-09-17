@@ -29,7 +29,9 @@ export const config = { maxDuration: 60 }
 
 const DEEZER = 'https://api.deezer.com'
 const TARGET_COUNT = 50
-const ALBUM_BATCH = 8 // concurrent album fetches; keeps us under Deezer's limit
+// Deezer "Radar Weekly" — emerging new releases, refreshed every Friday. This is
+// the real new-music source; the old /editorial/0/releases feed now returns empty.
+const RADAR_PLAYLIST_ID = 1282495565
 
 /** A song we are about to upsert (no id/created_at yet — Supabase fills those). */
 type NewSong = Omit<SongRow, 'id' | 'created_at'>
@@ -50,13 +52,6 @@ interface DeezerTrack {
   artist: DeezerArtist
   album?: DeezerAlbum
 }
-interface DeezerReleaseAlbum {
-  id: number
-  cover_xl: string | null
-  cover_big: string | null
-  artist: DeezerArtist
-}
-
 function sendJson(res: ServerResponse, body: unknown, status = 200): void {
   res.statusCode = status
   res.setHeader('content-type', 'application/json')
@@ -80,40 +75,16 @@ function toSong(track: DeezerTrack, albumArt: string | null): NewSong {
   }
 }
 
-/** Runs async `fn` over `items` in fixed-size concurrent batches. */
-async function inBatches<T, R>(
-  items: T[],
-  size: number,
-  fn: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const out: R[] = []
-  for (let i = 0; i < items.length; i += size) {
-    const batch = items.slice(i, i + size)
-    out.push(...(await Promise.all(batch.map(fn))))
-  }
-  return out
-}
 
-/** New releases: one previewable track per fresh album. */
+/** New releases: Deezer's "Radar Weekly" playlist (fresh drops, updated Fridays).
+ *  Its tracks carry preview + album art inline, so a single call is enough. */
 async function fromNewReleases(): Promise<NewSong[]> {
-  const releases = await deezerGet<{ data: DeezerReleaseAlbum[] }>(
-    `/editorial/0/releases?limit=${TARGET_COUNT}`,
+  const playlist = await deezerGet<{ data: DeezerTrack[] }>(
+    `/playlist/${RADAR_PLAYLIST_ID}/tracks?limit=100`,
   )
-
-  const perAlbum = await inBatches(releases.data, ALBUM_BATCH, async (album) => {
-    try {
-      const tracks = await deezerGet<{ data: DeezerTrack[] }>(
-        `/album/${album.id}/tracks?limit=10`,
-      )
-      const track = tracks.data.find((t) => t.preview)
-      if (!track) return null
-      return toSong(track, album.cover_xl ?? album.cover_big)
-    } catch {
-      return null // skip a flaky album rather than failing the whole seed
-    }
-  })
-
-  return perAlbum.filter((s): s is NewSong => s !== null)
+  return playlist.data
+    .filter((t) => t.preview)
+    .map((t) => toSong(t, t.album?.cover_xl ?? t.album?.cover_big ?? null))
 }
 
 /** Top-up: chart tracks already carry preview + album art inline (one call). */
