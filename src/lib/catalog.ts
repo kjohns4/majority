@@ -19,7 +19,7 @@ import { songFromRow, type Song, type SongRow } from '../types'
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** How far back Discover looks. Older songs stay in the DB but aren't swiped. */
-const DISCOVER_WINDOW_DAYS = 7
+const DISCOVER_WINDOW_DAYS = 14
 
 function discoverCutoffIso(): string {
   return new Date(
