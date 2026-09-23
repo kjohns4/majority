@@ -37,7 +37,16 @@ function App() {
       </main>
 
       <footer className="mt-12 text-center text-xs tracking-wide text-ink-soft/60">
-        rankings determined by you
+        <p>rankings determined by you</p>
+        <p className="mt-2">
+          feedback?{' '}
+          <a
+            href="mailto:majority8app@proton.me?subject=Majority%20feedback"
+            className="underline underline-offset-2 transition hover:text-ink"
+          >
+            majority8app@proton.me
+          </a>
+        </p>
       </footer>
 
       <Analytics />
