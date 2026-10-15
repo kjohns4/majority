@@ -111,25 +111,26 @@ All acceptance criteria met; deployed to production at https://majority-eight.ve
 - UI: minimalist cream redesign, dreamy serif, zero emojis
 - UX: full-cover play/pause; voting locked until the user has listened
 
-## Current task — Liked Songs (localStorage MVP, 2026-06-19)
+## Liked Songs — shipped & live (2026-06-20)
 A "Liked Songs" tab where users see every song they've Liked in this browser. Liking a
 song (vote = 1) saves a compact snapshot to localStorage; the tab lists them newest-first
-and each row plays the 30s preview (fresh signed URL via `/api/preview`).
+and each row plays the 30s preview (fresh signed URL via `/api/preview`). Merged to `main`
+(PRs #3–#8) and deployed to production — https://majority-eight.vercel.app.
 
 **Core constraint:** client-side only — clearing the cache loses the list. Acceptable for
 MVP; the UI is honest about it. localStorage is read back as *untrusted* (safe JSON parse).
 
-### What Claude Code can do autonomously
+### Delivered
 - [x] `src/hooks/useLikedSongs.ts` — localStorage read/write (safe parse, dedupe by id, newest-first)
-- [ ] Persist a snapshot `{songId, spotifyId, title, artist, albumArtUrl, likedAt}` when a Like is cast (CardView)
-- [ ] `LikedSongsView` page — lists liked songs newest-first, each row plays its preview
-- [ ] Add a "Liked" tab to `Navigation` + route it in `App` (extend the `View` type)
-- [ ] Typecheck + build green; one PR per atomic commit
+- [x] Persist a snapshot `{songId, spotifyId, title, artist, albumArtUrl, likedAt}` when a Like is cast (`CardView`)
+- [x] `src/components/LikedSongRow.tsx` — lazy, exclusive preview playback per row
+- [x] `src/pages/LikedSongsView.tsx` — lists liked songs newest-first, each row plays its preview
+- [x] "Liked" tab in `Navigation` + routed in `App` (`View` type extended with `'liked'`)
+- [x] Typecheck + lint + build green; one PR per atomic commit (6 stacked PRs)
 
-### What the engineer needs to do
-- Nothing new server-side: no schema, env var, or Vercel config change — the feature is
-  100% client-side and reuses the existing `/api/preview` proxy.
-- Review/merge the PRs; production auto-deploys on merge to `main`.
+### No engineer action needed
+- 100% client-side: no schema, env var, or Vercel config change — reuses the existing
+  `/api/preview` proxy. Production auto-deploys on push to `main`.
 
 ## V2 Backlog
 - User profiles / authentication (Supabase Auth via magic link)
@@ -180,6 +181,15 @@ MVP; the UI is honest about it. localStorage is read back as *untrusted* (safe J
   drop malformed entries) — localStorage is user-writable and untrusted. Key:
   `majority:liked-songs`. Preview URLs are never stored (they expire); rows resolve a
   fresh one via `/api/preview` at play time, exactly like SongCard.
+- **Stacked PRs can strand commits short of `main`** — when each PR's base is the
+  previous PR's branch (not `main`), merging them top-down in the GitHub UI cascades each
+  merge into its *intermediate base branch*, not into `main`. After "merging all," only
+  the bottom PR (base `main`) actually reaches `main`; the rest land in the stack's
+  branches and show MERGED while their code is absent from `main`. Verify with
+  `git merge-base --is-ancestor <sha> origin/main` per commit, then reconcile by rebasing
+  `main` over the full feature branch (shared commits dedupe). Happened with the Liked
+  Songs stack (PRs #3–#8) on 2026-06-20. Prefer a single feature PR, or merge a stack
+  strictly bottom-up retargeting each to `main` first.
 - Duplicate voting prevention: SHA-256 of a per-browser id stored in `ip_hash` (MVP
   stand-in for real IP hashing — good enough for day 1, not abuse-proof)
 - Deezer has an informal rate limit (~50 req / 5s); the seeder batches album fetches
