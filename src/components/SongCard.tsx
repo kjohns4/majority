@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { resolvePreview } from '../lib/catalog'
+import { trackPreviewPlay } from '../lib/analytics'
 import type { Song, VoteValue } from '../types'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -181,6 +182,8 @@ export default function SongCard({ song, onVote }: SongCardProps) {
           src={previewUrl}
           onPlay={() => {
             setIsPlaying(true)
+            // Count only the first play per card (resume after pause isn't new).
+            if (!hasPlayed) trackPreviewPlay('discover')
             setHasPlayed(true)
           }}
           onPause={() => setIsPlaying(false)}
