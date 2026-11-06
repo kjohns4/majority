@@ -5,6 +5,7 @@ import CardView from './pages/CardView'
 import LeaderboardView from './pages/LeaderboardView'
 import LikedSongsView from './pages/LikedSongsView'
 import type { View } from './types'
+import { trackViewChange } from './lib/analytics'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // App — top-level shell
@@ -19,6 +20,11 @@ import type { View } from './types'
 function App() {
   const [view, setView] = useState<View>('discover')
 
+  function changeView(next: View) {
+    if (next !== view) trackViewChange(next)
+    setView(next)
+  }
+
   return (
     <div className="mx-auto flex min-h-full max-w-2xl flex-col px-4 py-12">
       <header className="mb-8 text-center">
@@ -28,7 +34,7 @@ function App() {
         <p className="mt-1 text-xl italic text-ink-soft">Your choice</p>
       </header>
 
-      <Navigation view={view} onChange={setView} />
+      <Navigation view={view} onChange={changeView} />
 
       <main className="flex-1">
         {view === 'discover' && <CardView />}

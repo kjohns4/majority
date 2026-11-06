@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { resolvePreview } from '../lib/catalog'
+import { trackPreviewPlay } from '../lib/analytics'
 import type { LikedSong } from '../hooks/useLikedSongs'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -32,6 +33,7 @@ export default function LikedSongRow({ song, isActive, onActivate }: LikedSongRo
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const retriedRef = useRef(false)
   const wantsPlayRef = useRef(false)
+  const playTrackedRef = useRef(false)
   const [status, setStatus] = useState<Status>('idle')
   const [isPlaying, setIsPlaying] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -127,7 +129,14 @@ export default function LikedSongRow({ song, isActive, onActivate }: LikedSongRo
         <audio
           ref={audioRef}
           src={previewUrl}
-          onPlay={() => setIsPlaying(true)}
+          onPlay={() => {
+            setIsPlaying(true)
+            // Count only the first play per row (resume after pause isn't new).
+            if (!playTrackedRef.current) {
+              playTrackedRef.current = true
+              trackPreviewPlay('liked')
+            }
+          }}
           onPause={() => setIsPlaying(false)}
           onEnded={() => setIsPlaying(false)}
           onError={handleError}
